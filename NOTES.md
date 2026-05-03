@@ -320,6 +320,16 @@ BOOL sub_31287E10(int ctxStringPath, IStorage **ppstgOpen) {
 | 2026-05-03 | **§17**：QQ2009 **`MsgMgr.dll`** — **`Msg2.0.db`** 字面量仅 **`sub_61E4B590`** / 向导 **`sub_61E4D460`**；**`sub_61E60420`** 串联初始化；**`sub_61E5A690`** → **`FS::SetExitDelConfig(UserDataMsgStorage:, …)`** 与 **`bClrearMsgExit`**；QQ2009 **`IM.dll`** **`RemoveFileSystem`** 枚举无 **`UserDataMsgStorage:`** |
 | 2026-05-03 | **§18**：QQ2009 **`Common.dll`** — **`SetExitDelConfig`/`GetExitDelConfig`** → **`sub_604AEA20`/`sub_604AE9E0`** → vtbl **`+0x6C`/`+0x68`** → **`sub_604B34E0`/`sub_604B34B0`**（**`this+0x30`**）；析构 **`sub_604A7480`** 在标志非 0 时对 **`CTXStringW(this+8)`** 调用 **`DeleteFileW`**（常为 **`Msg2.0.db`** 路径）；**`off_6057FEA0` vs `off_6057F940`**；MsgMgr 五处 **`AddFileSystem`** 无 **`UserDataMsgStorage:`**；**`Matrix.dat`** 经 **`IM.dll` + `TXEncryptMgr`**，**ExitDel 不按名删 `Matrix.dat`**，并列文件时 **`Matrix.dat` 多数仍保留** |
 | 2026-05-03 | **§19**：QQ2009 **`KernelUtil.dll`** — **`FS::AddFileSystem(2, <Msg2.0.db 全路径>, L"UserDataMsgStorage:", …)`** 与 **`Info.db` → `UserDataInfoStorage:`** 均在 **`sub_60A3F970`**；**`RemoveFileSystem(UserDataMsgStorage:)`** 等见 **`sub_60A3F970`** 开头与 **`sub_60A37CB0`**；与 **§15.3** 两套 **`Matrix.dat`**、**§18.5** **`IM.dll` 仅消费挂载** 对齐 |
+| 2026-05-04 | **§15.3.1**：**`Common.dll`** **`sub_604A6C60`** — **`GetFileAttributesW` + `TXOpenStorage` + `TXCreateCompoundDocument`** 钉 **`Matrix.dat` 落盘**；**`IM.dll`** **`sub_606475A0` / `sub_606476E0`** 分用 **`Matrix.dat`（`msg2.0.db`）** 与 **`Matrix\Matrix.db`（`msgex`/`msgss`）**；**`Common.dll` 无 `Matrix.db` 字面量** |
+| 2026-05-05 | **§15.3.1** 增补：**「侧车文件一旦创建则走真实盘路径」≠「凡有 `Msg2.0.db` 则旁必有 `Matrix.dat`」** — 条件创建、仅拷贝库文件、版本/路径不一致等 |
+| 2026-05-06 | **§15.3.2**：**QQ2009 `Common.dll` `sub_604A6C60`** — **`TXCreateCompoundDocument`** 的 **布尔前提**（与 **`sub_604AA5A0` / `this+40` / 第二形参 `a2`**）；**`IM.dll`** **`sub_606475A0` / `sub_60647120`** 门槛 |
+| 2026-05-07 | **§15.3.3**：**`sub_60643D10` /「没到 `sub_604A6C60`」** — **汇编级判定**（**`[arg+0x18]`**、**仅 **`sub_60647120`** xref**；**`sub_604A7100` / `sub_604A8460`** 直接调 **`sub_604A6C60`**） |
+| 2026-05-08 | **§15.3.4**：QQ2009 **`IM.dll`** **`CreateDataStorage` 八调用点** + **`CheckMsg:`/`ImportMsg:`/`info.dat`** 上游；**`Common.dll`** **`sub_604A6C60` 十四调用者** — **端到端链条钉扎** |
+| 2026-05-09 | **§15.3.4（3.1）**：**QQ2009 `IM.dll`** — **`sub_606475A0`/`60648620`/`60649500`** 对 **函数入口** 的 **`code xref` 穷尽印证**；**`sub_60647120`** **仅虚表数据 xref**；**勿将口语场景等同于穷尽** |
+| 2026-05-10 | **§15.3.5**：**`Matrix.dat` 生成/打开的上层条件** — 钉 **`sub_60636130` 首参 = `pUnkOuter`（COM 聚合）**；**ATL `CreateInstance`（`sub_60609D10`）→ `this+0x24` 槽位调用 `sub_60636130`**；与 **`CheckMsg:` / `ImportMsg:`** 分支表、**`CLSID` `{A875AE08-…}`** 对象表项同列 |
+| 2026-05-11 | **§15.3.6**：**消息库 COM 对象三路虚表 + ATL 接口映射** — **`off_6084D678`/`off_6084D5A8` 全槽钉函数**；更正 **§15.3.5**：**聚合 vs 非聚合** **不**互斥 **`sub_60647120` 槽位** |
+| 2026-05-12 | **§15.3.7**：**`off_6084D618` `_ATL_INTMAP_ENTRY` 逐项解析** — **IID×`dw` 钉死**；**`6084d654`/`6084d664` 内联 IID + 第三张虚表** 与 **`off_6084D664`** 前缀五槽 |
+| 2026-05-13 | **§15.3.8**：**顶层调用链 + `Matrix.dat` 首次落盘** — **`sub_60648D70` 亦仅虚表 xref**；**`sub_6064F650` 委托槽→`sub_6064F430`**；修正 **§15.3.4（3.1）** 对 **`sub_60647120`/聚合** 的旧误 |
 
 ---
 
@@ -338,7 +348,7 @@ BOOL sub_31287E10(int ctxStringPath, IStorage **ppstgOpen) {
 
 | 修饰名（Mangling） | 语义（根据调用点归纳） |
 |-------------------|------------------------|
-| **`?CreateDataStorage@TXEncryptMgr@@YAJPB_WPAPAUITXDataStorage@@@Z`** | `HRESULT CreateDataStorage(wchar_t const *virtualOrOsPath, ITXDataStorage **pp)` — 打开 **`Matrix.dat`** 等路径对应的 **`ITXDataStorage`**（键值型文档接口，非裸 `CreateFileW`）。 |
+| **`?CreateDataStorage@TXEncryptMgr@@YAJPB_WPAPAUITXDataStorage@@@Z`** | `HRESULT CreateDataStorage(wchar_t const *virtualOrOsPath, ITXDataStorage **pp)` — 打开 **`Matrix.dat`** 等路径对应的 **`ITXDataStorage`**。实现侧经 **`TXOpenStorage` / `TXCreateCompoundDocument`** 落盘为 **TD 类复合文档**（见 **§15.3.1**），**不是**纯内存假路径。 |
 | **`?AddEncryptInfo@TXEncryptMgr@@YAJU_GUID@@PAUITXDataStorage@@PAUITXSvrSealCrypto@@PAUITXEncUIGetPass@@PAUITXCallback@@H@Z`** | 把 **`GUID`（加密实现 CLSID）**、`Matrix` 打开的 **`ITXDataStorage`**、**`Util::SvrSeal::CreateSvrSeal`** 得到的 **`ITXSvrSealCrypto`**、可选密码 UI、回调等 **绑定到全局加密管理器**。 |
 | **`?Init@TXEncryptMgr@@YAXKPAUITXBuffer@@@Z`** | `void Init(unsigned long flags, ITXBuffer *pwdOrMaterial)` — 见 **`sub_31022140`**：材料来自 **`bufPwdHashOne`**（见下）。 |
 | **`?QueryEncrypt@TXEncryptMgr@@YAJU_GUID@@PAPAUITXEncrypt@@@Z`** | `HRESULT QueryEncrypt(GUID const &, ITXEncrypt **pp)` — 按 **固定 CLSID** 取出 **`ITXEncrypt`** 实例，供消息包装 **加密/解密**（见 **§15.5**）。 |
@@ -347,12 +357,293 @@ BOOL sub_31287E10(int ctxStringPath, IStorage **ppstgOpen) {
 
 | 路径前缀 | 典型拼接 | 函数线索 | 用途 |
 |----------|-----------|----------|------|
-| **`UserDataMsgStorage:\Matrix.dat`** | **`FS::CombineQNC(..., L"Matrix.dat")`** | **`sub_31041510`**（`PerfStand.InitUserFileSystem`）、**`sub_31042D80`** | **消息库侧**：与 **`Msg2.0.db`** 同逻辑根的 **`Matrix.dat`**；**`sub_31042D80`** 在读 **`bufSvrSealEnc`**（见 **§15.4**）前创建该存储。 |
+| **`UserDataMsgStorage:\Matrix.dat`** | **`FS::CombineQNC(..., L"Matrix.dat")`** | **`sub_31041510`**（`PerfStand.InitUserFileSystem`）、**`sub_31042D80`**；**QQ2009 钉扎** **`sub_60648620` / `sub_60649500` / `sub_606475A0`**（**§15.3.4**） | **消息库侧**：与 **`Msg2.0.db`** 同逻辑根的 **`Matrix.dat`**；**`sub_31042D80`**（或 **QQ2009 `sub_60648620`**）在读 **`bufSvrSealEnc`**（见 **§15.4**）前 **`CreateDataStorage`**。 |
 | **`UserDataInfoStorage:\Matrix.dat`** | 同上，前缀不同 | **`sub_31021BE0`**（PreLogin） | **账号信息侧**：与 **`Info.db`** / **`bufPwdHashOne`** 初始化 **`TXEncryptMgr::Init`** 相关；**`Util::SvrSeal::CreateSvrSeal(2, …)`**（类型 **`2`**）。 |
 
 **与物理挂载（QQ2009）**：**`KernelUtil.dll`** 的 **`sub_60A3F970`** 依次 **`AddFileSystem`**：**`UserDataRoot:`**（类型 **`1`**）→ **`Msg2.0.db` 全路径 + `UserDataMsgStorage:`**（类型 **`2`**）→ **`Info.db` 全路径 + `UserDataInfoStorage:`**（类型 **`2`**）（字面量 **`Msg2.0.db`** / **`Info.db`** 与 **`aUserdatamsgsto_0`** / **`aUserdatainfost_0`** 同函数内成对出现）。因此 **§15.3** 两前缀下的 **`Matrix.dat`** 各落在 **两套用户数据根旁的两个独立文件**（通常与 **`Msg2.0.db`** / **`Info.db`** 并列目录），**不是** **`Msg2.0.db` 复合文档内部的两个同名流**。
 
+#### 15.3.1 **`Matrix.dat` 是否落盘；`Matrix.db` 与谁配对（钉扎）
+
+**曾不严谨处**：仅说 **「`CreateDataStorage` 非裸 `CreateFileW`」** 容易让人以为 **数据未必在真实文件上** —— 应对齐 **`Common.dll`** 里 **打开/创建存储** 的实现。
+
+- **钉扎（QQ2009 `Common.dll`，ImageBase `0x60400000`）**：包装类在首次需要 **`IStorage` 时** 走 **`sub_604A6C60` 同类逻辑**（与 **`this+8`** 上 **`CTXStringW` 已解析的完整 `…Matrix.dat` 宽路径** 绑定）：**`GetFileAttributesW`** → **`TXOpenStorage`**；若仍打不开且条件满足则 **`TXCreateCompoundDocument`** —— **在盘上创建/维持 TD 类复合文档**。因此 **`Matrix.dat`** 指 **真实路径上的侧车文件**（与 **`Msg2.0.db`** **并列、独立**，内容格式为 **TX 文档而非裸 SQLite**）；**若从未触发创建或路径不可写**，盘上可以 **暂时不存在**。
+- **`Matrix.db`（勿与 `Matrix.dat` 混名）**：**`IM.dll`** **`sub_606476E0`** 仅在路径中含 **`msgex.db`** 或 **`msgss.db`** 时拼接 **`<基路径>\Matrix\Matrix.db`**（字面量 **`L"Matrix.db"`**，如 QQ2009 **`0x6084e68c`**），用 **`FS::CreateFileW`** 走 **另一套消息库**；**`sub_606475A0`** 在路径含 **`msg2.0.db`** 时则使用 **`L"Matrix.dat"`** + **`TXEncryptMgr::CreateDataStorage`**。对 **`Msg2.0.db` 主归档线**，**客户端字符串与调用链均以 `Matrix.dat` 为准**；**`Matrix.db`** 是 **MsgEx/MsgSS** 场景下的 **不同文件名 + 子目录布局**。
+- **静态覆盖**：在 **QQ2009 `Common.dll`** 内对 UTF-16 **`Matrix.db`** 的按字节搜索 **无命中**；**`Matrix.db` 字面量仅见于 `IM.dll`** 上述分支。
+- **与实测「只有 `Msg2.0.db`、目录里找不到 `Matrix.dat`」不矛盾**（分析并无内在冲突）：
+  - **静态结论钉的是能力**：**一旦**某次运行沿 **`TXEncryptMgr::CreateDataStorage` → `sub_604A6C60`** 去 **打开/创建** 该路径，则性质是 **真实文件上的 TD 复合文档**，不是「纯虚拟假名」。这 **不蕴含**：任意一台机器上 **只要存在 `Msg2.0.db`**，同目录就 **必然** 带着 **`Matrix.dat`**。
+  - **`Matrix.dat` 依赖调用链是否跑到「要读/写 Seal 侧车」**（例如 **`sub_31042D80` / `PerfStand` 一类路径**，见 **§15.3** 表）。若从未触发、失败提前返回、或某版本/配置下加密侧未初始化，**库文件仍可 grow**，侧车文件可 **始终未创建**。
+  - **离线样本常见**：只拷贝了 **`Msg2.0.db`**（或整机镜像里漏掉并列文件）、原装机已卸载/清理、杀软或手动删过 **`*.dat`**、**QQ 安装路径与数据目录** 与当前查看的文件夹 **不是同一棵目录树**（需在 **`Users\...\Tencent Files\<QQ号>\`** 一类完整配置根下找 **与 `Msg2.0.db` 同父目录** 的 **`Matrix.dat`**，而不是只看你手上的这份 **`msg2.0.db` 拷贝所在目录**）。
+  - 仓库 **`README.md`** 已记录 **本地曾找不到 `Matrix.dat`** 的情形 —— 与 **§14–§15** 所述「密文还原依赖密钥材料」并行成立：**没有侧车文件时，更难离线解密，但不反证「客户端从不实现盘路径」**。
+
+#### 15.3.2 **何时真正创建磁盘上的 `Matrix.dat`（QQ2009 钉扎条件）**
+
+导出 **`?CreateDataStorage@TXEncryptMgr@@…`**（**`0x604A4CC0`**）只做：**`operator new` 包装对象**、把 **`wchar_t const *` 路径写入对象内 `CTXStringW`**、`*((_BYTE*)obj+16)=0`，**并不在一开始就调用** **`TXOpenStorage`**。首次落到盘上发生在 **`sub_604A4D60`** 惰性取 **`IStorage`** 时：**`sub_604A6C60(this, 0)`**（**第二实参恒为 `0`** 的这条主路径）。
+
+**`sub_604A6C60(this, a2)`**（`Common.dll`，`0x604A6C60`）里，**`TXCreateCompoundDocument`** 仅当同时满足：
+
+1. **`this+0xC`** 上缓存的 **`ITXStorage*`** 仍为空（已成功打开过则直接返回 **成功**，不会再创建）。
+2. **`sub_604AA5A0(路径)`** 返回 **非 0**：路径非空；并对 **父目录链** 做 **`GetFileAttributesW` / 递归 + `CreateDirectoryW`** —— **若无法在盘上构造出可写的目录前缀**，函数 **提前返回 0**，**根本不会调用** **`TXOpenStorage` / `TXCreateCompoundDocument`**。
+3. **`TXOpenStorage`** 失败：**`HRESULT < 0`**（文件不存在时通常会失败，才会考虑创建）。
+4. **`a2 == 0`**（惰性打开路径）：若 **`a2 != 0`**，会先要求 **`GetFileAttributesW` 成功且路径不是目录**（**`FILE_ATTRIBUTE_DIRECTORY` 未置位**），且 **不会** 走下面的创建分支；**`a2 == 0`** 时 **不** 做这一组「必须已存在普通文件」的检查。
+5. **`this+0x28`（`this+40`）为 0**：若 **非 0**，在 **`TXOpenStorage` 已失败** 时 **直接返回 `E_FAIL`（`-2147467259`）**，**同样不会调用** **`TXCreateCompoundDocument`**（静态语义：**禁止在该对象上落盘新建**，具体何种运行时状态会把 **`+40`** 置位尚未在此处钉死）。
+6. 以上成立后调用 **`TXCreateCompoundDocument(路径, 3, …)`**。
+
+补充：**`TXOpenStorage` 若已成功**（盘上已有可读 TD 文件），则 **`TXCreateCompoundDocument` 不会执行** —— 你看到 **`Msg2.0.db` 很大但没有 `Matrix.dat`**，在静态语义下仍可能是：**惰性打开从未成功跑到 **`sub_604A6C60`****（根本没触发 **`Matrix.dat` 路径**），或 **`sub_604AA5A0` / `this+40`** 挡住了创建 —— **不等于「库不完整」**。
+
+**`IM.dll` 侧何时会去拼 `Matrix.dat` 并调用 `CreateDataStorage`（仍不代表当次必落盘）：**
+
+- **`sub_606475A0`**：**`CTXStringW::MakeLower` 后 `Find(…, L"msg2.0.db", 0) != -1`**（路径宽字符串里 **必须出现 **`msg2.0.db`** 子串**）；然后 **`FS::CombineQNC` → `Matrix.dat`**，再 **`TXEncryptMgr::CreateDataStorage`**；接着对返回的 **`ITXDataStorage*`** 做一次 **`vtable+0x10`** 调用并得到 **`vtable+0x8`** 上的对象 —— **任一步失败整条作废**。也就是说：**仅适用于「某条逻辑路径携带含 `msg2.0.db` 的长路径」**，不是你的离线文件名随口叫 **`msg2.0.db`** 就一定会命中这条 helper。
+- **`sub_60647120`**（**`CombineQNC(L"UserDataMsgStorage:", L"Matrix.dat")` → `CreateDataStorage` → `AddEncryptInfo`**）：先判定 **`sub_60643D10(this)`** —— 内部依赖 **`seqbase.dat` / `lastmsginfo.dat` 等经 `FS::CreateFileW` 打开与读取**（失败则打 **`SeqHelper Init`** 类日志并 **不调用 `CreateDataStorage`**）。**即使你自认目录里其它文件都在**，只要 **`sub_60643D10` 走失败分支，`Matrix.dat` 这一条根本不会发起。**
+
+#### 15.3.3 **「人话」：`sub_60643D10` 何时算失败；何时叫「没到 `sub_604A6C60`」**
+
+**一、`sub_60643D10`（QQ2009 `IM.dll`，`0x60643D10`）——只在一条链上用**
+
+- **IDA xref**：**仅** **`sub_60647120`**（`0x60647151`）调用它。**别的 Matrix / Seal 路径根本不跑这个函数**；你若从没走过 **`sub_60647120`**，讨论 **`sub_60643D10`** 对你的 **`Matrix.dat` 有没有出现 **无关**。
+
+**二、调用约定钉死（`sub_60647120` 开头，`0x60647147`–`0x60647151`）**
+
+- **`sub_60647120` 的第一个参数 `arg0`**（上层传来的 **`ITXDataStorage*`** 一类指针）：
+  - **`this`** 传给 **`sub_60643D10`** 的是 **`arg0 - 4`**（**`lea ecx,[eax-4]` + `push ecx`**，栈参）。
+  - **`ECX`** 在 **`call` 前**被设为 **`[arg0 + 0x18]`**，作为 **`sub_60643D10` 的第二个参数 **`a2`**（宽字符上下文指针）。
+- **因此静态可复查的第一条失败条件**：**`[arg0+0x18] == NULL`** → **`sub_60643D10`** 立刻 **`return 0`**，并打 **`SeqHelper Init fail,参数不正确`**（字面量 **`aSeqhelperInitF`**）。**人话**：上层给的 **`SeqHelper` 宿主对象里，偏移 **`0x18` 那份指针没填好，整条专线一票否决。**
+
+**三、`sub_60643D10` 里还怎样会变成 0（进不了后面的 `CreateDataStorage`）**
+
+伪代码里 **`return HIBYTE(a2)`** 实为 **复用指针高位当成功标志**（编译器技巧）；**置 1** 的路径都在 **成功打开并处理了 `seqbase` / 写出缓冲** 一类分支。**大致可操作的判别**：
+
+| 现象（静态） | 含义（人话） |
+|--------------|----------------|
+| **`a2` 为空** | **`[arg0+0x18]` 没指到合法宽字符串上下文** → **失败**。 |
+| **`FS::CreateFileW(this+5 路径…)` 两处尝试都拿不到可读 `ITXFile`** | **`seqbase.dat`（或 FS 映射到的同名逻辑文件）在虚拟 FS 下打不开** → 走 **`unk_6084E424`** 日志串（与 **seqbase 打开失败** 语义一致），**`HIBYTE` 保持 0** → **`sub_60643D10` 返回 0**。 |
+| **`seqbase` 可读但长度 `< 4`** | 走 **`seqbase size = 0`** 分支（约 **`0x60643eed`**），打调试日志；后续仍可能 **`HIBYTE=1`** —— **不完全等价于「失败」**，随后 **`LABEL_20`** 还会继续 **`CreateFileW(this+6 …)`** 处理 **`lastmsginfo`**。 |
+
+**人话总结**：**「`sub_60643D10` 失败」**在实务里优先核对：**`[宿主+0x18]` 是否非空**；**`seqbase.dat` 是否在 QQ 当时挂载的 FS 下能被 `FS::CreateFileW` 打开**（路径是否真是你以为的那份、是否只拷了 `Msg2.0.db` 没拷 **`seqbase.dat`**、权限/占用）。
+
+**四、「惰性打开从没走到 `sub_604A6C60`」是什么意思**
+
+- **`TXEncryptMgr::CreateDataStorage`**（**`Common.dll` `0x604A4CC0`**）**只构造包装对象并写入路径**，**不等于已经执行 **`sub_604A6C60`****。
+- **`sub_604A6C60`** 会被 **多条** **`Common.dll`** 封装函数 **直接** 调用，例如：
+  - **`sub_604A7100`**（`0x604a714e`）：若 **`a2&&a3` 非空**、且 **`a1[10]==0`**，则 **`sub_604A6C60(a1, 0)`**，再继续 **`vtable+0x38` / `+0x30`** 等；
+  - **`sub_604A8460`**（`0x604a8460`）：若 **`*(a1+40)==0`** 且两个宽串非空，则 **`sub_604A6C60(a1, 0)`**，再拼流路径。
+- **人话**：**只要你拿到的 `ITXDataStorage*` 从来没被客户端拿去执行「需要底层 `IStorage` 已经就绪」的操作**（读某个属性流、打开子存储等——对应上述封装入口），**`sub_604A6C60` 就不会执行，`Matrix.dat` 也不会被创建或打开**。这和 **`Msg2.0.db` 是否在膨胀**无关：**后者走 OLE 挂载，前者走 TXEncryptMgr 侧车路径**。
+
+#### 15.3.4 **QQ2009 端到端：`UserDataMsgStorage:` → `Matrix.dat` / `bufSvrSealEnc` 全链条（钉扎）**
+
+**约定**：**`IM.dll`** ImageBase **`0x60600000`**；**`Common.dll`** ImageBase **`0x60400000`**（与 **§15.3.2–15.3.3** 一致）。**`TXEncryptMgr::CreateDataStorage`** 的导入桩 **`__imp_…`** 在 **`IM.dll`** 为 **`0x60842238`**。
+
+##### （1）底层：`KernelUtil` 先把物理消息库挂到虚拟前缀
+
+见 **§19**：**`FS::AddFileSystem(2, <Msg2.0.db 绝对路径>, L"UserDataMsgStorage:", …)`**。没有这一步，后面所有 **`UserDataMsgStorage:\…`** 宽路径都无法解析。
+
+##### （2）`IM.dll` 里 **`CreateDataStorage` 的全部八条调用点**（对 **`0x60842238`** 的 **code xref** 穷尽）
+
+前四行打开的是 **`…\info.dat`**（经 **`UserDataMsgStorage:`**），**不是 **`Matrix.dat`**；后四行才会拼 **`L"Matrix.dat"`**。
+
+| 地址 | 函数 | 拼的路径 / 行为（摘要） |
+|------|------|-------------------------|
+| **`0x60638B60`** | **`sub_60638B60`** | **`UserDataMsgStorage:` + (对象 `a1+8` 的通道名 BSTR) + `\info.dat`**；惰性 **`CreateDataStorage`** 写入 **`a1+28`** 上的 **`ITXDataStorage*`**；再 **`vtable+0x10`** 调用。 |
+| **`0x60638C20`** | **`sub_60638C20`** | 与上一行 **同路径拼接**；差别仅在 **`vtable+0x0C`**（与 **§12** 所述 **`+12`/`+16` 成对读写** 对齐）。 |
+| **`0x60639D70`** | **`sub_60639D70`** | **`Format(L"%s%s\\%s\\info.dat", L"UserDataMsgStorage:", …)`**（两截 BSTR 来自对象 **`+12`/`+16`**）；惰性 **`CreateDataStorage`** 写入 **`a1+48`**；**`vtable+0x10`**。 |
+| **`0x60639E50`** | **`sub_60639E50`** | 同上 **Format**；**`vtable+0x0C`**。 |
+| **`0x60647120`** | **`sub_60647120`** | **`CombineQNC(L"UserDataMsgStorage:", L"Matrix.dat")` → `CreateDataStorage` → `CreateSvrSeal(1)` → `AddEncryptInfo`**；**此前必须 **`sub_60643D10` 成功**（见 **§15.3.3**）。**仅经虚表指针引用**（**`0x6084D5B4`/`0x6084D684`** 数据 xref），**无指向函数入口的 `code xref`**（见下 **（3.1）**）。 |
+| **`0x606475A0`** | **`sub_606475A0`** | 路径 **`Find(L"msg2.0.db")`** → **`CombineQNC(基路径, L"Matrix.dat")` → `CreateDataStorage` → `vtable+0x10` → `vtable+0x8`**（轻量打开/查询链）。 |
+| **`0x60648620`** | **`sub_60648620`** | **`Find(L"msg2.0.db")`** 且 **非 `msgss.db`** → **`Matrix.dat` → `CreateDataStorage` → `vtable+0x10` → 按名 **`bufSvrSealEnc` → `vtable+0x44`（十进制偏移 `+68`，属性读写）** —— 与旧版笔记里 **`sub_31042D80`**（QQ2010）**同一职责**：**从 Matrix 拉 **`bufSvrSealEnc`**。 |
+| **`0x60649500`** | **`sub_60649500`** | **`CombineQNC(调用方传入的基前缀, L"Matrix.dat")` → `CreateDataStorage` → 读 **`bufSvrSealEnc` → `ITXBuffer` 校验 → `CreateSvrSeal(1)` / Seal 加密对象衔接**（失败码 **`0xE0632710`** 等特判）。 |
+
+##### （3）谁把这八处串进「用户能感知」的业务
+
+- **`sub_60648620`**：**唯一 `code xref`** 来自 **`sub_60648D70`**（**`0x60648ed4`**）。**`sub_60648D70`**：**校验盘上 `Msg2.0.db` 存在** → **`FS::AddFileSystem(2, …, L"CheckMsg:", …)`** → 构造 **`ITXData`** → 若 **`sub_60648830`** 某条件不成立则调用 **`sub_60648620(物理路径, L"CheckMsg:")`** 拉 **`bufSvrSealEnc`** → 最后 **`RemoveFileSystem(L"CheckMsg:")`**。即 **「检查/修复消息库」向导链路上的 Matrix 读取**。
+- **`sub_606475A0`** 与 **`sub_60649500`**：**对二者函数入口的 `code xref` 均只有 **`sub_6064F430`**（**`ImportMsg:`**），调用点分别为 **`0x6064f56b`**、**`0x6064f589`**；**`sub_6064F430`** 内部按 **`this+11` 路径与分支**（**`msgex`/`msgss`**、**`sub_606478C0`**、**buddy 解析** 等）择路。**`sub_6064F650`** 把 **`sub_6064F430`** 放进虚表；**`sub_60635C90`** **工厂 `operator new(0x58)`** 并挂 **`off_6084D5F0` / `off_6084D5A8` / `off_6084D594`** 后 **间接调用** 该虚方法（数据 xref：**`0x60635d00`**）。
+- **`info.dat` 四条**：**`sub_60638B60` / `60638C20` / `60639D70` / `60639E50`** **无直接代码 xref**（典型 **COM/接口表或间接调用**），语义上对应 **§12** 的 **按会话 **`info.dat`** 惰性 **`CreateDataStorage`****。
+
+##### （3.1）**`Matrix.dat` 三条「命名函数」+ `sub_60647120`：IDA `code xref` 印证与局限（QQ2009 `IM.dll`）**
+
+**前提**：下列为对 **函数首地址** 的 **`xref type == code`**（IDA）；**不统计**寄存器间接跳转、**不覆盖**插件/热补丁；**仅代表本 **`IM.dll`** 静态库。
+
+| 目标 | **指向入口的 `code xref` 条数** | **钉死的直接上层（若有）** | **备注** |
+|------|--------------------------------|---------------------------|----------|
+| **`sub_606475A0`** | **1** | 仅 **`sub_6064F430`**（**`0x6064f56b`**） | 在本 DLL 内 **没有**其它 **`call sub_606475A0`**。 |
+| **`sub_60648620`** | **1** | 仅 **`sub_60648D70`**（**`0x60648ed4`**） | **「检查消息库」**（**`CheckMsg:`**）链路。 |
+| **`sub_60649500`** | **1** | 仅 **`sub_6064F430`**（**`0x6064f589`**） | **「导入消息」**（**`ImportMsg:`**）链路之一支。 |
+| **`sub_60647120`** | **0**（入口） | **不经过 `call` 表**；**经 COM 虚槽 / `QI` 可达** | **仅**数据 xref：**`off_6084D5B0`/`D678`/`D664`/`D5A8`/`D594`** 等（**§15.3.6**）。**`sub_60636130` 首参 = `pUnkOuter`**：**聚合与非聚合两套布局在次级虚表均暴露同一 `sub_60647120` 指针**（**§15.3.5（3）**）—— **勿**再说「**`pUnkOuter==0` 就不走 `60647120`**」。 |
+| **`sub_60648D70`** | **0**（入口） | **不经过 `call` 表**；**经 COM 虚槽** | **仅**数据 xref：**`0x6084D5D8`**、**`0x6084D6A8`**（**`off_6084D5A8` / `off_6084D678`** 之 **`CheckMsg:`** 槽 **12**）。与 **`sub_60647120`** 同类：**IM.dll 内不存在**「谁 **`call` 了检查消息库入口」** 的静态边；**顶层**为宿主对已创建对象的 **虚调用**。 |
+
+**口语归纳的边界**：说「**检查消息库**、**导入消息**」会碰 **`Matrix.dat`** —— 对 **`60648620` / `606475A0` / `60649500`** 这三条 **有直接代码印证**（**`call` 自 **`60648D70` / `6064F430`**）；**`60647120`** 与 **`60648D70`** 则 **仅能从 COM 业务接口进入**，**不是**「未解析的神秘分支」。另：**`CreateDataStorage` 另外四条**走的是 **`info.dat`**，**勿与 `Matrix.dat` 混谈**。
+
+##### （4）`Common.dll`：谁在 **`CreateDataStorage` 之后** 触发 **`sub_604A6C60`**
+
+对 **`sub_604A6C60`** 的 **直接 call** 共 **14** 处（**IDA `xref type code` 穷尽**）：**`sub_604A4D60`**、**`sub_604A7100`**、**`sub_604A8150`**、**`sub_604A8260`**、**`sub_604A8460`**、**`sub_604A8790`**、**`sub_604A8960`**、**`sub_604A8B40`**、**`sub_604A8D30`**、**`sub_604A9090`**、**`sub_604A9360`**、**`sub_604A96D0`**、**`sub_604A99F0`**、**`sub_604A9E80`**。其中 **`sub_604A4D60`** 的指针落在 **`off_6057F940` 系虚表**（数据 xref **`0x6057FAE4` / `0x6057FB2C`**），是 **`CreateDataStorage` 包装对象**取 **`IStorage` 的主惰性入口**；其余封装均在 **「两参数宽路径 / 三参数流拷贝 / 打开子存储」** 等操作前 **先 `sub_604A6C60(this,0)`**。**人话**：**IM 调了 `CreateDataStorage` 之后，只要后续走到「在 TD 里按名字碰流/子存储」的 Common 侧实现，就一定会先落到 **`sub_604A6C60`**；若 IM 只拿到了指针却不再调用这些封装，则磁盘侧车永远不会被打开。**
+
+##### （5）一图式串联（只列主线）
+
+**挂载**：**`KernelUtil::…AddFileSystem(UserDataMsgStorage:)`**（**§19**）→ **`FS::CombineQNC` 任意 **`UserDataMsgStorage:\…`** 有效** → **八条之一 `CreateDataStorage`**（**`Matrix.dat` / `info.dat` / …**）→ **`Common.dll`** 某封装 **`sub_604A…`** → **`sub_604A6C60`** → **`TXOpenStorage` / `TXCreateCompoundDocument`**。
+
+**读 `bufSvrSealEnc`（与 §15.4 表对照）**：静态已钉 → **`sub_60648D70` → `sub_60648620`**（**`CheckMsg:`**）；**`sub_6064F430` → `sub_60649500`**（**`ImportMsg:`**，分支条件见 **（3）/§15.3.5**）。另：**`sub_60647120`** 亦 **`CreateDataStorage(Matrix.dat)`**；**上层**为 **同一 coclass 之 COM 虚槽**（**§15.3.5–15.3.8**），**不是**未解析的「神秘界面」。
+
 消息初始化路径 **`sub_31041510`** 调用 **`Util::SvrSeal::CreateSvrSeal(1, …)`**（类型 **`1`**），再 **`AddEncryptInfo`** —— 与登录侧 **类型 2** 区分，表示 **两套 Seal 上下文**（同一 API，不同实例/用途）。
+
+#### 15.3.5 **`Matrix.dat` 生成/打开：上层条件总表（QQ2009 `IM.dll` + `Common.dll`）**
+
+**约定**：**「生成」** = 盘上首次 **`TXCreateCompoundDocument`** 或 **`CreateDataStorage` 后惰性打开并创建**（**§15.3.2**）；**「仅打开」** = 已存在 TD 文件则 **`TXOpenStorage` 成功**、**不**再 **`TXCreateCompoundDocument`**。
+
+##### （0）**跨线公共前提（几乎恒成立）**
+
+- **虚拟前缀解析**：**`KernelUtil.dll`** 已 **`AddFileSystem(…, L"UserDataMsgStorage:", …)`**（**§19**），否则 **`UserDataMsgStorage:\…`** 宽路径在 **`FS::CombineQNC` 侧无意义**。
+- **Common 惰性落盘门闩**（**§15.3.2**）：**`sub_604AA5A0` 成功**、**`TXOpenStorage` 失败**、**`a2==0`**、**`this+0x40==0`** 等 **同时**满足，才会 **`TXCreateCompoundDocument`**；否则可能 **仅持有 `ITXDataStorage*`** 而 **从未** 在当次运行中 **创/开** 盘文件。
+
+##### （1）**`CheckMsg:` 线（`sub_60648D70` → `sub_60648620`）— 读 `bufSvrSealEnc` 时 `CreateDataStorage`**
+
+| 条件 | 静态含义 |
+|------|-----------|
+| **`lpFileName` 合法且盘上可读** | **`GetFileAttributesW(lpFileName) != -1`**；否则 **`E_POINTER`**（`-2147024809`）提前返回。 |
+| **`CheckMsg:` 挂载成功** | **`FS::AddFileSystem(2, …, L"CheckMsg:", …)`**（忽略返回值语义时需结合上下文）。 |
+| **`CreateTXData` 成功** | 分配 **`ITXData*`** 失败则 **`E_FAIL`**。 |
+| **`sub_60648830(L"CheckMsg:", a3, …)` 返回假** | **才会** **`call sub_60648620(物理库路径, L"CheckMsg:")`**；若该函数先 **成功** 建立/读到加密元数据，则走 **另一支** 写 **`eEncryptType` / `strEncryptQuestion`**，**不**调 **`sub_60648620`**。 |
+| **`sub_60648620` 内部** | 路径 **`MakeLower` 后**：若含 **`msgss.db`** → **直接返回成功标记且不 `CreateDataStorage`**（**短路**）；否则必须 **`Find(msg2.0.db)` 命中** 才 **`CombineQNC(…, Matrix.dat)` + `CreateDataStorage`**。 |
+
+##### （2）**`ImportMsg:` 线（`sub_6064F430` → `sub_606475A0` / `sub_60649500`）**
+
+以 **`sub_6064F430`** 反编译（**`this+10`/`+11`/`+12`/`+13`/`+16` 为对象字段**）为准：
+
+| 条件 | 静态含义 |
+|------|-----------|
+| **`*(this+10) != 0`** | **整条导入块才会执行**；否则函数 **尽早返回**，**不**挂 **`ImportMsg:`**、**不**碰 **`Matrix.dat` 两条 helper**。 |
+| **挂载与 **`sub_606476E0`** 分支** | 先 **`CTXBSTR(this+11)` + `FS::AddFileSystem(…, L"ImportMsg:", …)`**，再 **`sub_606476E0(路径, L"ImportMsg:", &v21)`**。**若为真**：进入 **`msgss`/buddy/`CreateTXBuffer`** 等 **子分支**（**`sub_60649110` / `sub_6064B160`** 等），**此树内未必调用 **`sub_606475A0`**；若为 **假**：落入 **`else if (sub_606478C0)` / `else`**。 |
+| **`sub_606478C0(L"ImportMsg:")` 为真** | 走 **`sub_6064BEE0`**，**不**走本节 **`Matrix.dat` 两 helper**。 |
+| **上述均为假时的 `else`** | 先 **`sub_606475A0(路径, L"ImportMsg:")`**（**`0x6064f56b`**）。**仅当**其返回 **非 0**（**`sub_606475A0` 内对 `msg2.0.db` 打开链成功**）时：若 **`*(this+12) != 0`** 转 **`sub_60647A30` + `sub_6064E6E0`**；**若 **`*(this+12)==0`** 则 **`sub_60649500(this, 路径, L"ImportMsg:")`**（**`0x6064f589`**）。**若 **`sub_606475A0` 返回 0**（路径里 **没有** `msg2.0.db` 子串或存储打开失败），落 **`sub_6064CB90`** 支，**不**调用 **`sub_60649500`**。 |
+| **`sub_606475A0` 自身** | **`Find(L"msg2.0.db")` 必须命中**；然后 **`CombineQNC(基前缀, L"Matrix.dat")` + `CreateDataStorage`**，并对 **`ITXDataStorage`** 做 **`vtable+0x10` → `vtable+0x8`** 轻量探测；任一步失败则 **返回 0**。 |
+| **`sub_60649500` 自身** | **`CreateDataStorage` 失败或 `bufSvrSealEnc` / `ITXBuffer` 校验失败** 返回 **`0xE0632710`**（`-530372848`）等；成功路径可能 **`CreateSvrSeal(1)`**。 |
+
+##### （3）**`sub_60647120` 线（SeqHelper + `AddEncryptInfo`）— COM 聚合 vs 普通创建**
+
+| 事实 | 说明 |
+|------|------|
+| **`sub_60636130(a1,a2,a3)` 的分支** | **`a1 != 0` → `sub_60635EC0`**；**`a1 == 0` → `sub_60635C90(0,…)`**。 |
+| **`a1` 的语义（更正）** | **`sub_60609D10`**（ATL 风格 **`CreateInstance` 外壳**）通过 **`(*(…))(this+0x24)`** 调用 **`sub_60636130`** 时，**第一形参**来自 **`CreateInstance` 的 `pUnkOuter`**（反编译中 **`sub_60609D10(a1,a2,a3,a4)`** 对槽函数调用 **`(a2,a3,a4)`**，其中 **`a2` 即 outer）。因此 **`a1` 非「神秘 flag」**，而是 **标准 COM：外层控制对象非空 ⇒ 聚合（aggregation）内对象创建**。 |
+| **聚合路径** | **`pUnkOuter != 0`** → **`sub_60635EC0` → `operator new(0x60)` + `sub_60635DA0`**：主虚表 **`off_6084D6E4`**；**`*(this+8)`** 起依次为 **`off_6084D6C0`、`off_6084D678`、`off_6084D664`**；**`*(this+20)=outer`**。次级调度虚表 **`off_6084D678`** 槽 **[3]** → **`sub_60647120`**（见 **§15.3.6**）。 |
+| **非聚合路径** | **`pUnkOuter == 0`** → **`sub_60635C90` → `operator new(0x58)`**：主虚表 **`off_6084D5F0`**；**`obj[1]=off_6084D5A8`**，**`obj[2]=off_6084D594`**。**更正**：**非聚合对象同样在次级虚表暴露 **`sub_60647120`** — **`off_6084D5A8` 槽 [3]**（及 **`off_6084D594` 槽 [8]** 再起一段相同尾部）与 **`off_6084D678[3]`** **同源指针**。**因此「Import 只有 `sub_6064F430`、绝无 `60647120`」不成立**：**直接 `call`** 的 **`ImportMsg:`/`Matrix.dat` helpers** 仍只见 **`606475A0`/`60649500`**；**`60647120`** 在该分支下主要为 **COM 虚槽 / QI 可达**，与 **`sub_6064F430`** **并行（不同调用约定）**。 |
+| **对象表钉扎（本映像）** | **`.data`** 中 **`0x608C82F8`** 指向 **CLSID 本体 **`0x60843E9C`** → **`{A875AE08-E87E-48F4-8806-CE4E1BE59758}`**；紧随 **`0x608C8300`–`0x608C8304`** 为 **`sub_6060AC30` / `sub_60636130`**，与本组件 **ATL 注册块** 同一邻域 —— **哪个外层 coclass 在运行时以聚合方式创建该接口 → 需结合宿主进程/UI DLL**，但 **静态上已把「触发源」收窄到「聚合 `CoCreateInstance`」这一类**。 |
+| **函数体内门槛** | **`sub_60643D10` 失败**（**§15.3.3**）则 **打 **`SeqHelper Init 失败`** 日志并 **`E_FAIL`**，**不**执行 **`CreateDataStorage`**。 |
+
+##### （4）**小结：四条 `Matrix.dat` 触顶条件（不含 `Common.dll` 惰性细节）**
+
+| 线 | 顶层充分条件（代码层） |
+|----|-------------------------|
+| **`sub_60648620`** | **`sub_60648D70` 走到 `call sub_60648620`**，且 **`msgss.db` 未短路**、**`msg2.0.db` 命中**。 |
+| **`sub_606475A0`** | **`sub_6064F430` 活跃**（**`*(this+10)!=0`**）且分支落到 **`sub_606476E0` 假**、**`sub_606478C0` 假**、并最终 **`call sub_606475A0`**；且 **`sub_606475A0` 内 `Find(msg2.0.db)` 命中**。 |
+| **`sub_60649500`** | 同上 **`ImportMsg:`** 树，且 **`sub_606475A0` 已成功返回**、**`*(this+12)==0`**，从而 **`call sub_60649500`**。 |
+| **`sub_60647120`** | **虚槽调用 + `sub_60643D10` 成功**。**构造路径**：**`pUnkOuter != 0`** → **`sub_60635DA0` 布局**；**`pUnkOuter == 0`** → **`sub_60635C90` 布局** — **两套均在次级虚表 **[3]**（或 **`D594` [8]** 嵌套）挂 **`sub_60647120`**（**§15.3.6**）。**仅当宿主通过对应 **IID** 调该槽且 **`SeqHelper` 就绪**，才实际 **`CreateDataStorage(Matrix.dat)`**。 |
+
+#### 15.3.6 **`IM.dll` 消息库 COM 对象：虚表 / ATL 映射静态全集（QQ2009，ImageBase `0x60600000`）**
+
+本节把 **`sub_60636130`** 分叉两侧的 **`.data` 虚表** 钉到 **函数名**，并说明 **`AtlInternalQueryInterface`** 用的 **接口映射块**。**槽索引均为「函数指针下标」（`×4` 字节）**。
+
+##### （1）**构造体与三套接口指针**
+
+| 构造 | 大小 | 主虚表（**对象首字**） | **`this+8` / `+12` / `+16` 三接口指针** |
+|------|------|------------------------|------------------------------------------|
+| **`sub_60635DA0`**（聚合链 **`sub_60635EC0`**） | **`0x60`** | **`off_6084D6E4`** | **`off_6084D6C0`、`off_6084D678`、`off_6084D664`**；**`*(this+20)=outer`** |
+| **`sub_60635C90`**（**`sub_60636130`，`pUnkOuter==0`**） | **`0x58`** | **`off_6084D5F0`** | **`obj[1]=off_6084D5A8`，`obj[2]=off_6084D594`** |
+
+##### （2）**`IUnknown` / `CreateInstance` 钉扎**
+
+- **`sub_60609D10`**：**`(*(…))(factory_this+0x24)(pUnkOuter, riid, ppv)`** → **`sub_60636130`**（即 **`CreateInstance` Creators 槽**，不是 **`sub_60647120` 本体**）。
+- **`sub_6060E6E0`**：**`return sub_607D44B0(a1-4, a2, a3)`** — **this 调整 `-4`** 的标准 **IUnknown 转发**（指向聚合对象 **inner** 的首部）。
+- **主接口 `QueryInterface`**：
+  - **`off_6084D6E4[0]` → `sub_60635E30`**：**`AtlInternalQueryInterface(a1 + 8, &off_6084D618, …)`** — QI 相对真实对象 **`+8`**（首个接口指针槽）。
+  - **`off_6084D5F0[0]` → `sub_60635D80`**：**`AtlInternalQueryInterface(a1, &off_6084D618, …)`** — QI 相对 **对象首址**（无 **`+8`**）。
+- **`sub_60635E30` 快路径**：若 **`riid`** 通过 **`IUnknown`** 判定（反编译：**`*a2==0 && a2[1]==0 && a2[2]==192 && a2[3]==1174405120`**），则 **直接返回 `this` 并 `AddRef`**；否则走 **`off_6084D618`** 映射表。
+
+##### （3）**`AtlInternalQueryInterface` 映射 **`off_6084D618`**：首部 IID**
+
+- **`unk_60848E80`** 起首 **16 字节（LE）** 解析为 **`IID`**：**`{EB5398EC-11ED-49EE-A1FA-B478FAA157C6}`**。
+- 紧随其后的 **`wchar_t[]`** 与 **`MSGFILE`/`SHARE`** 等 **壳层注册串** 混排 —— **整块作为 **`_ATL_INTMAP`** / **`_ATL_OBJMAP_ENTRY`** 邻域数据** 被链接进 **`off_6084D618`**；**后续 dword** 中夹杂 **`0x00000004`/`0x00000001`** 等 **ATL 元数据**，**不是**有效 **`call` 目标**（**`off_6084D5F0`** 主虚表 **[10]–** 亦可见同类 **「代码/数据交错」**）。
+
+##### （4）**次级调度虚表 **`off_6084D678`**（聚合对象 **`*(this+12)`）— 全槽函数**
+
+与 **`off_6084D5A8`**（非聚合 **`obj[1]`**）从 **「dtor + Matrix 槽」** 起 **函数指针序列对齐**（**`D5A8` [2]=`sub_6060F1E0`** 对应 **`D678` 前接 `IUnknown` 三槽**）。
+
+| 槽 | 地址 | 语义（反编译摘要） |
+|----|------|---------------------|
+| **0** | **`sub_6060E6E0`** | **`sub_607D44B0(this-4, …)`**，**IUnknown** |
+| **1–2** | **`sub_6062B410` / `sub_6062B400`** | **引用计数 / `IUnknown` 余槽** |
+| **3** | **`sub_60647120`** | **`UserDataMsgStorage:` + `Matrix.dat` + `CreateSvrSeal(1)` + `AddEncryptInfo`**（**§15.3.3**） |
+| **4–7** | **`sub_6064AFB0` … `sub_6064A910`** | **Seal / Matrix 辅助（.delegate `this+32` 等）** |
+| **8** | **`sub_60647500`** | 若 **`*(this+32)`** 空则 **`sub_60638630`**；再 **`vtable+12`** 转发 |
+| **9** | **`sub_606470A0`** | **`vtable+16`** 单次调用 |
+| **10** | **`sub_60647410`** | **链式 **`vtable+24`** 取子对象再聚合调用 |
+| **11** | **`sub_60649840`** | **`ExportMsg:`** — **`DeleteFileW`**、`AddFileSystem(ExportMsg)`、`QueryEncrypt`、`info.dat`/`content.dat`/`msg.dat` 拷贝等 **整段导出** |
+| **12** | **`sub_60648D70`** | **`CheckMsg:`** — 与 **§15.3.4** 所述 **`call sub_60648620`** **同一函数** |
+| **13** | **`sub_60648FB0`** | **`CheckMsg:`** 另一入口 — **`sub_606476E0` / `sub_60647F80` / `sub_60647A30`** 分支 |
+| **14** | **`sub_6064A5C0`** | **写 **`CTXBSTR` 路径、`sub_60646F10`、`TXTimer::SetAsyncCallback`** — **异步导出/回调登记** |
+| **15–16** | **`sub_607C5060`** ×2 | **占位 thunk** |
+| **17** | **`sub_60646E40`** | **下游委托** |
+| **18–26** | **`sub_607D44B0` … `sub_606497D0`** | **ATL/Tencent 通用 thunk 与 **`sub_606497D0`**（与 **`D5F0[8]`/`D5B0[24]`** 同源）** |
+| **27** | **`sub_60635E30`** | **再次出现 **`QueryInterface`**（**聚合对象 secondary 侧 **QI**）** |
+| **28+** | **`sub_606E6300` …** | **尾部 **`IUnknown`/tear-off** 与 **GUID 常量区**交叠** — **静态上视为 **元数据/衔接块**，**勿按代码指针调用** |
+
+##### （5）**与 **`off_6084D5B0` / `off_6084D664`** 的关系**
+
+- **`off_6084D5B0`**：**「缩短版」调度表** — **[0]=`sub_6060F1E0`（dtor）**，**[1]=`sub_60647120`**，**[2..14]** 与 **`off_6084D678`** **同一业务序列偏移对齐**；**[16]=`sub_60635D80`**（**直接 **`AtlInternalQueryInterface(..., off_6084D618)`**）；**[25]=`sub_60635C30`**；**[26]+** 为 **`unk_60848E80` + 小整数**，同 **（3）** — **ATL 掺数据**。
+- **`off_6084D664`**（**第三接口指针**，**`sub_60635DA0`** 写入 **`*(this+16)`**）：**不是** **`off_6084D678`** 的简单尾拷贝 —— **§15.3.7** 钉死：**虚表首址 **`0x6084D664`**；**槽 [0]–[4]** 为 **`sub_60737350`、`sub_607F6850`、`sub_606DB400`、`sub_60647070`、`sub_60649800`**（**Tencent 前缀 thunk**）；自 **[5]** 起 **`sub_6060E6E0`（`IUnknown`）…**，**`sub_60647120` 落在槽 [8]**（对照 **`off_6084D678` [3]**：**整块 **`IUnknown`+业务** 序列相对前移 **5** 槽）。内联 **IID** 与 **`AtlInternalQueryInterface` 映射** 见 **§15.3.7**。
+
+##### （6）**结论（回应「虚函数挖完没有」）**
+
+- **`sub_60647120`**：**唯一实现体**；**出现在 **`off_6084D5B0[1]`、`off_6084D678[3]`、`off_6084D664[8]`、`off_6084D5A8[3]`、`off_6084D594[8]`** 等 **`.data`** —— **语义均为同一实现经由 **不同虚表/前缀槽位** 暴露**（**§15.3.7** 补 **`off_6084D664`**）。
+- **`CheckMsg`**：**`sub_60648D70`**（槽 12）与 **`sub_60648FB0`**（槽 13）**并存**；**仅前者**在 **`sub_60648830` 失败**时 **`call sub_60648620`**（**§15.3.4**）。
+- **`ExportMsg`**：**`sub_60649840`**（槽 11）**独立大函数**，与 **`ImportMsg:`** 的 **`sub_6064F430`** **不同栈**，但 **同属该 COM 对象的业务接口**。
+
+#### 15.3.7 **`AtlInternalQueryInterface(&off_6084D618)`：INTMAP 逐项解析 + 内联 IID/`off_6084D664`（已钉）**
+
+对 **`.rdata`** 做 **`DWORD`** 级遍历：**`off_6084D618`**（**`0x6084D618`**）起为标准 **`_ATL_INTMAP_ENTRY` 对 **`(const IID *piid, DWORD_PTR dw)`****，**直至 **`(NULL,NULL)`**。
+
+##### （1）**INTMAP 主体（**`0x6084D618` … `0x6084D648`**）**
+
+| `#` | **`piid`（_VA）** | **`dw`** | **resolved IID（若 `piid` 指向 16B GUID）** | **静态含义** |
+|-----|-------------------|---------|-----------------------------------------------|--------------|
+| 0 | **`0x60848E80`** | **`0x00000004`** | **`{EB5398EC-11ED-49EE-A1FA-B478FAA157C6}`** | **`ATL` 映射第一项**：**接口指针相对 **`IUnknown`/对象基址** 的 **`ATL` 偏移 **`dw=4`****（与对象 **`this+4`** 字段共存约定一致）。 |
+| 1 | **`0x00000001`** | **`0x6084D654`** | — | **`ATL` 扩展项**（**第一DWORD为哨兵 **`1`**）：**第二DWORD为 **`const IID *`** → **`0x6084D654`**，解析见下行。 |
+| — | **`0x6084D654`** | （内联存储） | **`{CC6B8374-D121-C849-A8B6-97C973A26192}`** | **物理存放**：**INTMAP 项 #1 所指 IID**，亦为 **`0x6084d650` 区段内联 GUID**（见 **（2）**）。 |
+| 2 | **`0x00000008`** | **`0x00000001`** | — | **哨兵/附加字段项**（典型 **`ATL/COM` 链式映射宏**变体）；**具体宏名需对照编译期 **`atlcom.h`**，静态 **仅钉数值**。 |
+| 3 | **`0x60846A48`** | **`0x00000000`** | **`{5D206F0D-9BFE-4691-B1CE-1C7659BCAC0D}`** | **`dw=0`**：**接口指针与 **`QI` 接受的 **`this`** 同址** 或 **零偏移绑定**。 |
+| 4 | **`0x00000001`** | **`0x60846A58`** | — | **同类型哨兵项**：**第二DWORD **`0x60846A58`** → IID **`{00020400-0000-0000-C000-000000000046}`**（**`IDispatch`**）。 |
+| 5 | **`0x00000000`** | **`0x00000001`** | — | **列表尾部附加项**（**非 **`(0,0)`** 终止子**）；**`ATL` 实现细节项**。 |
+| **结束** | **`0x00000000`** | **`0x00000000`** | — | **`INTMAP` 终止子**（**`{NULL,NULL}`**）。 |
+
+##### （2）**INTMAP 之后的 **内联 IID + `vtable`**（**`0x6084D650` 起**）**
+
+- **`0x6084D650`**：**`DWORD 0`** 填充。
+- **`0x6084D654`**：**16 字节 IID** = **`{CC6B8374-D121-C849-A8B6-97C973A26192}`**（与 **表项 #1** 指针一致）。
+- **`0x6084D664`**：**即符号 **`off_6084D664`** — **该 IID 对应虚表首址**。**槽 [0]–[4]**：**`sub_60737350`、`sub_607F6850`、`sub_606DB400`、`sub_60647070`、`sub_60649800`**；**槽 [5]–[7]**：**`IUnknown`**（**`sub_6060E6E0`、`sub_6062B410`、`sub_6062B400`**）；**槽 [8]**：**`sub_60647120`**；**槽 [9]–[15]**：与 **`off_6084D678`** **同序列**（**`6064AFB0`…`60647410`**）。  
+  **结论**：**第三接口**相对 **`off_6084D678`** **多 5 个前缀槽**，**`60647120` 的槽下标由 `[3]` 变为 `[8]`** —— **§15.3.6（5）** 已据此更正。
+
+##### （3）**与 **`unk_60848E80`** 的 UTF-16 尾巴**
+
+**`0x60848E80+0x10`** 起为宽字符串字面量（**`MSGFILE…` / `…IN_SHARE` / `…CALLBACK` 碎片** 等），与 **`IID` 头 16 字节**同属 **`ATL` 注册/类型库邻域** —— **勿把 UTF-16 字符单元当成 **`IID*`** 指针去解引用**。
+
+#### 15.3.8 **顶层调用链再挖：`Matrix.dat` 何时首次生成（盘上新建 TD）**
+
+**区分三件事**：（A）**业务上** 谁会走到 **`CreateDataStorage(UserDataMsgStorage:\Matrix.dat)`**；（B）**惰性 I/O** 里 **`Common.dll`** **`sub_604A6C60`** 是否执行；（C）在该执行路径上 **`TXOpenStorage` 失败且 §15.3.2 全成立** 时，才会 **`TXCreateCompoundDocument`** —— **才是「生成」`Matrix.dat` 文件**。仅有 **`Msg2.0.db`** 或仅 **`CreateDataStorage` 返回指针** 都 **不足以** 保证（C）。
+
+##### （1）**IM.dll 内「谁调用顶层入口」— `xref` 复查（QQ2009）**
+
+- **`sub_60648D70`（`CheckMsg:` 槽 12，会 **`call sub_60648620`**）**：对函数入口的 **`code xref` 条数为 0**；**仅** **`.data`** **`0x6084D5D8`、`0x6084D6A8`** 指向其地址 —— 与 **`sub_60647120`** 同构：**检查消息库** 在 **`IM.dll` 内也不是普通 **`call` 图可达**，而是 **消息库 coclass 实例化之后** 对 **虚表槽 12** 的调用。
+- **`sub_6064F430`（`ImportMsg:` 主入口，`call sub_606475A0` / `sub_60649500`）**：**仅** **`sub_6064F650`**（**`0x6064f724`**）**数据** 引用；**`sub_6064F650`** 在构造里执行 **`*(_DWORD *)(*(this+18)+16) = sub_6064F430`** —— 把导入逻辑挂到 **`this+18`** 所指 **内部委托对象** 的 **vtable 槽**，**不是** 主对象 **`off_6084D5F0[0]`** 直接指向 **`sub_6064F430`**。**`sub_6064F650`** 又 **仅** 被 **`sub_60635C90` / `sub_60635DA0`** 在 **`CoCreate` 路径上调用（**`0x60635d00` / `0x60635ddc`**）**。
+- **结论**：**跨 DLL 的「顶层」** = **某宿主（主程序 / **`MsgMgr.dll`** / 脚本宿主等）** **`CoCreateInstance(CLSID …)`** 拿到 **`{A875AE08-E87E-48F4-8806-CE4E1BE59758}`**（**`0x60843E9C`**）对象后，再 **`QueryInterface`/虚调用** 到 **`CheckMsg:` / `ImportMsg:` / 槽 [3] `sub_60647120`** 等。**§17** 中 **`MsgMgr.dll`** **`sub_61E4D460`**（导入向导状态 **20**）与 **`sub_61E4B590`** 选 **`Msg2.0.db`** 路径，是 **业务侧** 与 **导入** 最相近的静态锚点；**在本仓库未附带 MsgMgr 二进制供 IDA 自动化时**，**GUID→具体「哪一个按钮/哪一个 `CoCreate` 调用点」** 仍需在 **宿主 IDB** 内对 **16 字节 CLSID** 或 **相关 ProgID** 做检索 —— **`IM.dll` 单独静态分析无法再接上一层**。
+
+##### （2）**「生成」`Matrix.dat` 的充分条件（把 §15.3.2 接到具体 IM 路径）**
+
+在 **（A）`KernelUtil` 已挂 `UserDataMsgStorage:`**（**§19**）前提下，**任一条** 成立且 **后续真正触发 Common 惰性打开** 时，**才可能** 在盘上 **新建** **`Matrix.dat`**（若已存在则 **只打开**）：
+
+| 业务线（IM） | 进到 **`CreateDataStorage(Matrix.dat)`** 的最窄门槛（§15.3.5 已列） | 进而触发 **`sub_604A6C60` 的典型动作** |
+|--------------|----------------------------------------------------------------------|----------------------------------------|
+| **`sub_60648D70` → `sub_60648620`** | **`sub_60648830("CheckMsg:",…)==0`**；路径 **`Find(msg2.0.db)`** 命中且 **非 **`msgss.db`** 短路** | **`CreateDataStorage`** 后对 **`ITXDataStorage*`** 调 **`vtable+0x10`（取子对象/打开存储）** 与 **`vtable+0x44` 按名读 **`bufSvrSealEnc`**（**`sub_60648620`** 反编译 **`0x60648705`–`0x60648760`**）— **会拉 **`IStorage`**，从而进入 **`sub_604A6C60`**** |
+| **`sub_6064F430` → `sub_606475A0`** | **`*(this+10)!=0`**，**`sub_606476E0`/`sub_606478C0` 分支不抢走**，且路径 **`Find(msg2.0.db)`** 命中 | 同上，**`vtable+0x10` → `+0x8`** 轻量链（**§15.3.4**） |
+| **`sub_6064F430` → `sub_60649500`** | 在上一行 **`sub_606475A0` 已成功** 且 **`*(this+12)==0`**（见 **§15.3.5（2）**） | **读 **`bufSvrSealEnc`** / **`ITXBuffer` 校验** 等 — **必碰存储** |
+| **`sub_60647120`** | **`sub_60643D10` 成功**（**§15.3.3**），随后 **`CreateDataStorage` + `AddEncryptInfo`** | **注册 Seal 后**，若 **仍有代码路径** 对同一 **`ITXDataStorage*`** 做 **需底层 **`IStorage`** 的操作**，才 **落盘**；**仅 `CreateDataStorage` 不读不写** 时 **仍可能无文件**（与 **§15.3.3**「没到 **`sub_604A6C60`**」一致） |
+
+**人话**：**只有在你跑了「检查消息库」或「导入消息」里命中 **`msg2.0.db` 分支**、或 **有别处虚槽调用了 `sub_60647120` 且 SeqHelper 成功** —— **并且** **`Common` 允许创建** —— 目录里才会 **第一次出现** **`Matrix.dat`**。日常 **只登录、只收发消息** 若 **从未** 触发上述 UI/组件路径，**可以一直没有该文件**；这与 **`Msg2.0.db` 存在** **不矛盾**。
 
 ### 15.4 密钥与封印材料（`ITXData` 字段名 — 来自宽字符串字面量）
 
