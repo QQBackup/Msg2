@@ -1,2 +1,6 @@
 /.venv*
 __pycache__
+
+/BAK_FILE/
+/downloads/qq-legacy/
+/extracted/qq-legacy/
