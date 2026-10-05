@@ -330,6 +330,7 @@ BOOL sub_31287E10(int ctxStringPath, IStorage **ppstgOpen) {
 | 2026-05-11 | **§15.3.6**：**消息库 COM 对象三路虚表 + ATL 接口映射** — **`off_6084D678`/`off_6084D5A8` 全槽钉函数**；更正 **§15.3.5**：**聚合 vs 非聚合** **不**互斥 **`sub_60647120` 槽位** |
 | 2026-05-12 | **§15.3.7**：**`off_6084D618` `_ATL_INTMAP_ENTRY` 逐项解析** — **IID×`dw` 钉死**；**`6084d654`/`6084d664` 内联 IID + 第三张虚表** 与 **`off_6084D664`** 前缀五槽 |
 | 2026-05-13 | **§15.3.8**：**顶层调用链 + `Matrix.dat` 首次落盘** — **`sub_60648D70` 亦仅虚表 xref**；**`sub_6064F650` 委托槽→`sub_6064F430`**；修正 **§15.3.4（3.1）** 对 **`sub_60647120`/聚合** 的旧误 |
+| 2026-10-05 | **§20 结案**：**`bufSvrSealEnc`** = **CS `0x12C`（prelogin）服务端赎回凭据**；**`DecryptMsg`**（`off_313194E0[+0x10]` → `sub_310620F0` → `sub_31061A40`）是**命令包构造器**而非本地解密；`Matrix.dat` 逐记录展开（`bSysLocalHash`/`bValidInit`/`bufSvrSealEnc`）；`content.dat` 较新分块格式；**正文离线解密架构上不可行** |
 
 ---
 
@@ -914,5 +915,127 @@ BOOL sub_31287E10(int ctxStringPath, IStorage **ppstgOpen) {
 
 - **`Msg2.0.db`** 与 **`Matrix.dat`** **仍是两个不同角色**：前者是 **OLE 挂载目标**（**§18.4**：**`DeleteFileW` 常指向 `this+8` → `Msg2.0.db`**）；后者走 **`TXEncryptMgr`** 小对象链（**§18.6**），**ExitDel** 路径不会按文件名删除 `Matrix.dat`。
 - **`UserDataInfoStorage:`** 侧 **`Matrix.dat`** 不在 **`Msg2.0.db`** 目录内；归档时需 **分别复制** 两套前缀旁（或与 **`Info.db`**/**`Msg2.0.db`** 并列）的 **`Matrix.dat`**（见 **§15.3** 增补段）。
+
+---
+
+## 20. 结案（2026-10）：`bufSvrSealEnc` 是 **CS `0x12C`（prelogin）的服务端赎回凭据** —— 正文离线解密在架构上不可行
+
+**结论先行**：`ITXSvrSealCrypto::DecryptMsg`（`vtable+0x10`）**不是本地解密函数**，而是一个 **CS 命令包构造器**：它把 `bufSvrSealEnc` 拆成 `cKeyID` + `bufData`，连同 `bufSigSession` / `bufPwdForConn` 以及一组网络重传参数，组装成 **`wCsCmdNo = 300 = 0x12C`（prelogin）** 的命令包交给 CS 通道。**解封印的密钥在服务端**，客户端不存在对应的本地算法。
+
+### 20.1 静态钉扎（QQ2010 `IM.dll.i64`，ImageBase `0x30000000`）
+
+| 环节 | 结果 |
+|---|---|
+| seal 实现对象 vtable | **`off_313194E0`** |
+| `DecryptMsg` 槽（`vtable+0x10`） | **`sub_310620F0`**（数据 xref 来自 **`313194F0`**） |
+| 包装 | **`sub_310620F0(this, a2, a3)`** → **`sub_31061A40(0, a2)`** |
+| 本体 | **`sub_31061A40`**（1487 字节；`a2 = 0` 为解密方向） |
+| 分发对象 | **`unk_313086E0`**（与 **`sub_31003E20`** 共用；后者以 `wCsCmdNo = 335` 组包） |
+
+`sub_31061A40` 反编译摘要（`a2 = 0`）：
+
+```c
+// (1) 拆封印
+v51 = *pSeal;                                // seal[0]     -> cKeyID
+sub_31002B90(&v59, pSeal + 1, len - 1);      // seal[1:]    -> bufData
+
+// (2) 从【另一份 ITXData】取登录态材料
+sub_31003450(&unk_313086F0, &v53);
+v54->vtbl[17](v54, L"bufSigSession", &v56);
+v54->vtbl[68](v54, L"bufPwdForConn", &v58);
+CTXCommPack::AddBufLenWord(&v46, &v56, 1);
+
+// (3) 组装 CS 包
+SetInt(TXData, L"cType",           (a2 == 0) + 1);
+SetInt(TXData, L"cAppType",        this[8]);
+SetInt(TXData, L"cKeyID",          v51);     // <- seal[0]
+SetBuf(TXData, L"bufData",         v59);     // <- seal[1:]
+SetBuf(TXData, L"bufOrgBuf",       a3);
+SetInt(TXData, L"wCsCmdNo:",       300);     // * 0x12C = prelogin
+SetInt(TXData, L"cPacketPerTime",  1);
+SetInt(TXData, L"cRetryLimit",     7);
+SetInt(TXData, L"dwRetryInterval", 2000);
+
+// (4) 投递
+sub_310612B0(&transport);
+(*(*pDispatcher + 12))(pDispatcher, TXData, transport, ctx);
+```
+
+**判定为网络包（而非本地解密）的五条依据**：
+
+1. `wCsCmdNo` 是 CS 命令号 —— 见本仓库 `msg2_parser/qq2013_cs_protocol.py`：*"Incoming CS packets are dispatched by command number `wCsCmdNo`"*。
+2. **`300 = 0x12C`** 即同文件中的 **`CMD_PRELOGIN_0x12C`**。
+3. `cPacketPerTime` / `cRetryLimit` / `dwRetryInterval` 是网络重传参数；本地对称解密不需要。
+4. 同一分发对象（`unk_313086E0` 系）的另一使用者 **`sub_31003E20`** 同样以 **`wCsCmdNo = 335`** 组包。
+5. 与 `qq2013_cs_protocol.py` 的独立发现吻合：***"Prelogin path `sub_6875041A` reads ITXData key `bufPwdHashOne` … then drives TXEncryptMgr / seal proxy"*** —— 驱动 seal 的正是 **prelogin** 路径。
+
+> **勘误（`NOTES_BUF_ENC.md` §8.6）**：该处曾把末尾的四参数调用读作 *「`ITXEncrypt` 虚表 `+0x0C`」*。实际上 `pDispatcher` 来自 **`unk_313086E0`**（CS 分发对象），**不是** `ITXEncrypt`；该调用语义是 **投递 CS 命令包**。`ITXEncrypt` 与 `+0x1F` 密钥材料的关系另见 **§16.7**。
+
+### 20.2 样本 `Matrix.dat`（168 字节）逐记录展开
+
+`msg2.0/unpacked_from_msg20db/Matrix.dat`，头 **`TD 54 44 01 01`**（版本 1.1），`nrec = 3`。
+键名混淆：**`name[i] = (~raw[i] & 0xFF) ^ ((nw & 0xFF) ^ ((nw >> 8) & 0xFF))`**，`nw` = 本记录的名字长度字（`uint16 LE`）。
+记录布局：`u8 typ` + `u16 nw` + `nw` 字节混淆名 + `u32 plen` + `plen` 字节 payload。
+
+| # | `typ` | 键名 | `plen` | payload |
+|---|---|---|---|---|
+| 1 | 1 | **`bSysLocalHash`** | 4 | `01 00 00 00` |
+| 2 | 1 | **`bValidInit`** | 4 | `01 00 00 00` |
+| 3 | 9 | **`bufSvrSealEnc`** | **61** | `c1 c3 c1 c2 c2 dc 10 e2 … d5 48 71 9a d6 73 69 81`（首字节 `c1` = `cKeyID`） |
+
+解析后**恰好消耗 168 字节**，无尾随数据。
+
+**关键**：该文件**只有这 3 个键**。以下字段**全部缺失**：
+**`bufRandKeyEnc`、`buffrLocalPasswdHash`、`buffLocalAnswerHash`、`bufLocalHash1`、`strLocalQuestion`、`bufPwdHashOne`、`buf16byteSessionKey`、`bufSigSession`、`bufPwdForConn`、`cPassSeqID`**。
+
+### 20.3 QQ2009 `Common.dll` 侧的分支选择
+
+`IM.dll sub_60647120` → `Util::SvrSeal::CreateSvrSeal` + `TXEncryptMgr::AddEncryptInfo` → `Common.dll` 的 **`sub_604A2C50`**（最后一参非 0 那条）→ **`sub_604A0E40`**。
+
+`sub_604A0E40` 按 `bSysLocalHash` 分流；`sub_604A2C50` 再按 `bValidInit` 分流：
+
+| `bValidInit` | `bSysLocalHash` | 需要的盘上材料 | 走的分支 | 本样本 |
+|---|---|---|---|---|
+| 0 | * | — | **首次初始化**：`Util::Sys::Random` + `CoCreateGuid()` XOR 生成 16 字节；写 `bSysLocalHash = 1`；若 **`DAT_605c00b8 != 0`** 则用全局密钥 **`0x605c00a8`** 加密后存为 **`bufRandKeyEnc`**，写回 `ITXData` | ✗ |
+| 1 | 0 | `bufRandKeyEnc` +（`buffrLocalPasswdHash` / `buffLocalAnswerHash` / `bufLocalHash1` 之一） | `sub_604A0C30(bufRandKeyEnc, &out, 本地口令哈希)` → 16 字节写入 `this+0x1F` | ✗ 材料缺失 |
+| 1 | ≠0 | `bufRandKeyEnc` | `sub_604A0C30(bufRandKeyEnc, &out, *(0x605c00a8))` → 16 字节写入 `this+0x1F` | ✗ 材料缺失 |
+| **1** | **≠0** | **`bufSvrSealEnc`** | 读封印 → `this[3]->vtbl[0x10]`（= **`DecryptMsg`**）→ **CS `0x12C` 投递** | ✅ **命中** |
+
+- **`sub_604A0C30`** = `bufRandKeyEnc` 的封套解码：要求首字节 `0x01`，再 `sub_60402340(buf+1, len-1, key16, …)` —— 与 `msg2_parser/msg2_full_decrypt.py` 的手法一致。**`bufRandKeyEnc` 是 XXTEA 信封，`bufSvrSealEnc` 不是。**
+- 因此本样本只命中最后一行：**唯一的密钥来源就是那 61 字节封印**。
+
+### 20.4 `index.dat` / `content.dat`（较新格式）
+
+样本 `group/2035673180`（`content.dat` 8 390 872 字节）：
+
+- **`index.dat`**：连续 `(u32 key, u32 offset)` 8 字节记录，共 20 000 条，按 `offset` 递增；首条 `(0x8477, 0)`，末条 `(0x2F9EF, 8 390 298)`。
+- **`content.dat`**：若干 chunk 顺序拼接，每个 chunk 为
+
+```
+u32 chunk_len      // 含本字段自身
+u32 0
+u32 msg_key        // == index 里对应的 key
+u32 msg_time       // Unix 时间戳
+u32 rand32         // Util::Msg::GetMsgRand32
+── 重复 1..N 次 ──
+  u32 L            // 本条载荷长度
+  L 字节：0x01 + 8 字节对齐的 XXTEA 信封
+```
+
+实测 chunk0：`chunk_len = 454`、`msg_key = 0x8477`、`msg_time = 0x4B3C2DDE`、`rand32 = 0x0422773B`；`@20 L = 201`（`01` + 200 字节）、`@225 L = 225`（`01` + 224 字节），合计恰为 454。
+
+（旧格式样本 `buddy/1002598880` 用 **`-:`** / **`.:`** / **`/:`** 三个标记字构成 8 字节索引、`content.dat` 分两块，见 **§14.1–§14.2**。）
+
+### 20.5 不可行性结论
+
+| 路径 | 判定 |
+|---|---|
+| 本地对称解密 `bufSvrSealEnc` | **不存在该代码路径**（§20.1） |
+| 爆破 128 位会话密钥 | `2^128`，不可行；且猜出的 16 字节还要通过 §20.3 的分支校验 |
+| 由盘上其它字段反推 | 本样本**没有任何**其它密钥字段（§20.2） |
+| 机器绑定反推 | **`MachineGuid`** 链路（§16.5）属 **`txssogbcf.db`**，与消息库无关 |
+| 服务端赎回 | **唯一正路**，需要当年同一会话的 CS `0x12C` 响应包，或运行时内存中 `ITXEncrypt+0x1F` 的 16 字节 |
+
+**结论**：只要服务端不再应答 `0x12C`，**正文即永久不可读**。归档只能停在「会话列表 / 条数 / 时间」这一层；这是**协议设计**所致，与逆向完成度无关。
 
 ---

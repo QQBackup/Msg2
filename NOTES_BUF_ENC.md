@@ -107,18 +107,18 @@
 | **磁盘语义** | **`bufSvrSealEnc`** 存的是 **需经 `ITXSvrSealCrypto::DecryptMsg`（vtable +0x10）处理的密文/封装**，不是可直接阅读的明文。 |
 | **算法位置** | **对称/哈希的具体循环不在 `Common.dll` 的 `sub_30097FF0` 内展开**；实现在 **`ITXIMSvrSealCrypto`** 实现类中（由 **`CreateSvrSeal` + ITXCore 工厂** 给出）。 |
 | **CLSID** | 工厂使用的 CLSID 为 **`{EDC5158A-8148-401A-9F2B-A72863BCA24A}`**（`KernelUtil` **`unk_318680A4`**）。 |
-| **是否已命名为「AES / RSA / XXTEA」** | **仍无**单一 FIPS 式命名。**`DecryptMsg` 本体**（**§8.6**：`IM.dll` **`sub_31061A40`**）走 **`bufSigSession`/`bufPwdForConn` + `CTXCommPack` + `ITXEncrypt::vtable+12`**，属 **产品内会话封印管道**，不是裸 **AES**/**XXTEA** 标签。 |
+| **是否已命名为「AES / RSA / XXTEA」** | **不是对称算法**。**`DecryptMsg` 本体**（**`IM.dll`** **`sub_310620F0`** → **`sub_31061A40`**）是 **CS `0x12C`（prelogin）命令包构造器**：把封印拆成 **`cKeyID`**+**`bufData`**，连同 **`bufSigSession`**/**`bufPwdForConn`** 与网络重传参数打包投递给服务器。**已结案，见 §10**。 |
 | **与 `DecodeHash`/`Decode16` 的关系** | **`DecodeHash`/`Decode16`** 在 **`Common.dll`** 另有定义（**§8.2 / §8.3**），且被 **`IM.dll`** 多处 **非封印** 代码调用；**已钉死的 `DecryptMsg` 路径不以 `DecodeHash` 为主**。若盘上某些字段仍是 **23 字符哈希外观串**，才可能单独走 **`DecodeHash`**。 |
 | **与 `bufRandKeyEnc` 的 XXTEA 信封关系** | **不能等同**（`sub_30097FF0` 对 Seal 只走 **vtable+0x10** → **`sub_310620F0`**，不经 **`sub_30002340`**）。 |
-| **密钥从哪来（概要）** | **盘上**：**`bufSigSession`、`bufPwdForConn`、`bufPwdHashOne`、`buf16byteSessionKey`、`cPassSeqID`** 等与 **`Matrix`/登录** 同源；**运算侧**：**`TXEncryptMgr::Init` → MD5(flags∥16B)→ `ITXEncrypt`**（详见 **`NOTES.md` §15–§16**）；**`DecryptMsg`** 只 **组装并投递** 到 **`ITXEncrypt`**，见 **§8.8**。 |
+| **密钥从哪来（概要）** | **盘上**：**`bufSigSession`、`bufPwdForConn`、`bufPwdHashOne`、`buf16byteSessionKey`、`cPassSeqID`** 等与 **`Matrix`/登录** 同源；**运算侧**：**`TXEncryptMgr::Init` → MD5(flags∥16B)→ `ITXEncrypt`**（详见 **`NOTES.md` §15–§16**）；**`DecryptMsg`** 把封印 + **`bufSigSession`/`bufPwdForConn`** 打包成 **CS `0x12C`** 命令包 **投递给服务端**（**§10**；原「投递到 `ITXEncrypt`」的写法见 **§8.6** 勘误）。 |
 
 ---
 
-## 7. 建议的下一步（留给后续 IDA 会话）
+## 7. ~~建议的下一步~~（前 3 项已由 §10 结案）
 
 1. **`IM.dll.i64`（优先）**：`IM.dll` 的 **`.rdata` GUID 表**（约 VA **`0x3130782c`** 起含本 CLSID）说明 **coclass 与主程序同仓注册** 的可能性大。对 **实现 `ITXIMSvrSealCrypto` 的 CComObject** 做 **RTTI/ATL 头** 或 **vtable 扫**：定位 **`vtable+0x10`** 的 **具体函数地址** 并反编译，确认是否 **仅** 调 `Encode::DecodeHash` / `Decode16` + `ITXBuffer` 搬运。
 2. **`KernelUtil.dll.i64`**：仅 **`CreateSvrSeal` + `ITXCore::vtable+0x1C` 工厂** 引用该 CLSID；**PE 内无** 其它指向 `unk_318680A4` 的指针，**KernelUtil 未必承载 `DecryptMsg` 体**。
-3. ~~对锁定的 **`DecryptMsg` 实现**……~~ **已钉死：见 §8.6**（`IM.dll` **`sub_310620F0` → `sub_31061A40`**，走 **`ITXEncrypt`** 与 **`bufSigSession`/`bufPwdForConn`**，**不是** 以 **`DecodeHash`** 为主路径）。
+3. ~~对锁定的 **`DecryptMsg` 实现**……~~ **已钉死：见 §8.6 / §10**（`IM.dll` **`sub_310620F0` → `sub_31061A40`**）。**修正**：末段那个四参数调用**不是** `ITXEncrypt`，而是 **CS 命令包投递**；**`DecryptMsg` 本身不解密任何东西**。
 4. 若用户可提供 **platform/components 类 XML** 或 **安装目录清单**，与 **§8.4** 交叉验证 coclass 实际所在 PE。
 
 ---
@@ -166,7 +166,8 @@
   - **`+0x0C`**：**`sub_31062010`** —— 内部 **`call sub_31061A40`** 前 **`push 1`**（与 **`push 0`** 分支相对，属 **另一接口方法**，如 **EncryptMsg / Init** 语义需再对符号表）。
   - **`+0x10`**：**`sub_310620F0`** —— **`call sub_31061A40`** 前 **`push 0`**（**解密侧**）；即 **`Common.dll` `sub_30097FF0` 里 `(*(seal+16))(seal, …)` 命中此处时，对应本槽**。
 - **`sub_310620F0`（stdcall，`retn 0Ch`）**：校验 **`arg_4`、`arg_8`**；**`this+0x18`** 为空时才继续；**`ecx=this`** 调 **`sub_31061A40`**，栈上第二参为 **`0`**，第三参来自 **`arg_4`**（输入 **`ITXBuffer`**）；成功时对 **`this+0x18`** 做 **`AtlComPtrAssign(arg_8)`**。
-- **`sub_31061A40`（核心）**：从 **`unk_313086F0`** 打开 **`ITXData`**，读 **`bufSigSession`**、**`bufPwdForConn`**（宽键名与 **`sub_31002AD0`** 字面量一致）；把 **`bufSvrSealEnc` 侧传入的缓冲区** 与上述字段 **打包进 `ITXData`**（含 **`cType`/`cAppType`/`cKeyID`/`bufData`/`bufOrgBuf`**、`CTXCommPack` 等）；最终 **`(*(*ITXEncrypt)+12)(…)`** —— 即 **`ITXEncrypt` 虚表偏移 `0x0C`**，四参数调用（与 **`NOTES.md`** 里 **`ITXEncrypt` +12** 的讨论一致）。**主线是「会话封印包 + 加密管道提交」**，**不是** **`Util::Encode::DecodeHash` 单独解码器**。
+- **`sub_31061A40`（核心）**：从 **`unk_313086F0`** 打开 **`ITXData`**，读 **`bufSigSession`**、**`bufPwdForConn`**（宽键名与 **`sub_31002AD0`** 字面量一致）；把 **`bufSvrSealEnc` 侧传入的缓冲区** 与上述字段 **打包进 `ITXData`**（含 **`cType`/`cAppType`/`cKeyID`/`bufData`/`bufOrgBuf`**、`CTXCommPack` 等）；并对 **`wCsCmdNo` 赋 `300`（`0x12C`）**、**`cPacketPerTime = 1`**、**`cRetryLimit = 7`**、**`dwRetryInterval = 2000`**。最后 **`(*(*pDispatcher + 12))(pDispatcher, TXData, transport, ctx)`**。
+  - **⚠️ 勘误（原表述）**：此处曾读作「`(*(*ITXEncrypt)+12)(…)` = `ITXEncrypt` 虚表 `+0x0C`」。实际上 **`pDispatcher` 来自 `unk_313086E0`**，是 **CS 分发对象**，不是 `ITXEncrypt`；该调用的语义是 **投递 CS 命令包**（详见 **§10**）。
 
 ### 8.7 样本 `msg2.0/Matrix.dat`（用户目录）
 
@@ -192,3 +193,40 @@
 
 - `NOTES.md` **§5 / §15 / §16**：`Matrix.dat`、`TXEncryptMgr`、`bufSvrSealEnc`、`PerfStand.DecryptMsg`、`XXTEA`/`MD5` Init、 **`ITXEncrypt` +12** 与 **`ITXSvrSealCrypto` +16** 讨论。
 - **`DecryptMsg` 实现**：已在本文 **§8.6** 与 **`IM.dll`** **`off_313194E0[+0x10]` → `sub_310620F0` → `sub_31061A40`** 对齐；**`bufRandKeyEnc`/`sub_30002340` XXTEA 信封** 仍为 **另一条链**（见 `NOTES.md` §16）。
+
+---
+
+## 10. 结案（2026-10）：`DecryptMsg` 是 **CS `0x12C`（prelogin）命令包构造器**，不是解密函数
+
+**一句话**：`bufSvrSealEnc` **不是本地可解的密文**，而是 **服务端赎回凭据**；`DecryptMsg` 只负责把它打包成 **`wCsCmdNo = 300 = 0x12C`** 的 CS 命令包发出去，服务器返回密钥。因此 **消息正文的离线解密在架构上不可行**。
+
+### 10.1 事实（QQ2010 `IM.dll.i64`）
+
+`sub_31061A40(this, a2 = 0, a3 = 封印缓冲)`：
+
+1. **拆封印**：`cKeyID = pSeal[0]`；`bufData = pSeal[1:]`（`sub_31002B90`）。
+2. **取登录态材料**：`sub_31003450(&unk_313086F0, …)` 打开 **另一份 `ITXData`**，读 **`bufSigSession`**、**`bufPwdForConn`**；`CTXCommPack::AddBufLenWord` 打包。
+3. **组装 CS 包**：`cType`、`cAppType`（`this+8`）、`cKeyID`、`bufData`、`bufOrgBuf`、**`wCsCmdNo: = 300`**、`cPacketPerTime = 1`、`cRetryLimit = 7`、`dwRetryInterval = 2000`。
+4. **投递**：`sub_310612B0(&transport)` 取传输对象后 `(*(*pDispatcher + 12))(pDispatcher, TXData, transport, ctx)`。
+
+### 10.2 为什么判定是网络包
+
+| 依据 | 说明 |
+|---|---|
+| `wCsCmdNo` 语义 | `msg2_parser/qq2013_cs_protocol.py`：*"Incoming CS packets are dispatched by command number `wCsCmdNo`"* |
+| 命令号 | `300 = 0x12C` = 同文件的 **`CMD_PRELOGIN_0x12C`** |
+| 重传参数 | `cPacketPerTime` / `cRetryLimit` / `dwRetryInterval` 只对网络包有意义 |
+| 同类调用 | 共用 `unk_313086E0` 的 **`sub_31003E20`** 亦以 `wCsCmdNo = 335` 组包 |
+| 交叉印证 | `qq2013_cs_protocol.py`：*"Prelogin path … drives TXEncryptMgr / seal proxy"* —— 驱动 seal 的正是 **prelogin** |
+
+### 10.3 与 `bufRandKeyEnc` 路径的区别（务必分清）
+
+| 字段 | 形态 | 本地可解？ |
+|---|---|---|
+| **`bufRandKeyEnc`** | `0x01` + XXTEA 信封（密钥 = 本地口令/密保哈希，或全局常量 **`0x605c00a8`**） | **可**（`Common.dll sub_604A0C30` → `sub_60402340`）—— 但本样本**没有**该字段 |
+| **`bufSvrSealEnc`** | 服务端封印 | **不可**，须 CS `0x12C` 赎回 |
+
+### 10.4 追溯资料
+
+- `NOTES.md` **§20**：完整钉扎（vtable / 反编译摘要 / `Matrix.dat` 逐记录 / `Common.dll` 分支表 / `content.dat` 分块 / 不可行性表）。
+- 修正：本文 **§6** 表格「是否已命名为 AES/RSA/XXTEA」一行与 **§8.6** 末尾的 `ITXEncrypt+12` 旧读法。
